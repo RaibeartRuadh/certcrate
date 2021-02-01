@@ -1,0 +1,81 @@
+---
+- hosts: all
+  become: true
+  vars:
+    - server_hostname: royproject.ru
+    - key_size: 4096
+    - passphrase: # Set if you want passphrase
+    - key_type: RSA # Others include DSA, ECC, Ed25519, Ed448, X25519, X448
+    - country_name: RU
+    - email_address: robroyway@gmail.com
+    - organization_name: royproject
+  tasks:
+
+  - name: Install EPEL Repo
+    yum:
+      name: epel-release
+      state: present
+
+  - name: Ставим пакеты через YUM для дела и удобства
+    yum:
+      name: "{{ packages }}"
+      state: present
+    vars:
+      packages:
+      - nano
+      - mc
+      - python-pip
+      - python-devel
+      - libselinux-python
+
+  - name: Ставим пакеты через PIP
+    pip:
+      name: "{{ packages }}"
+      state: present
+    vars:
+      packages:
+      - cryptography
+      - pyOpenSSL
+
+  - name: Сделаем директорию куда положим готовые сертификаты и ключи
+    file: 
+      path: /home/vagrant/cert
+      owner: root 
+      group: root 
+      mode: 0755 
+      state: directory
+
+
+
+
+#sudo openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout
+#/etc/ssl/private/nginx-selfsigned.key -out /etc/ssl/certs/nginx-selfsigned.crt
+
+
+
+  - name: Генерируем приватный ключ OpenSSL
+    openssl_privatekey:
+      path: "/home/vagrant/cert/{{ server_hostname }}_privkey.pem"
+      size: "{{ key_size }}"
+      type: "{{ key_type }}"
+      backup: yes
+      
+  - name: Генерируем OpenSSL сертификат с данными из vars
+    openssl_csr:
+      path: "/home/vagrant/cert/{{ server_hostname }}.csr"
+      privatekey_path: "/home/vagrant/cert/{{ server_hostname }}_privkey.pem"
+      country_name: "{{ country_name }}"
+      organization_name: "{{ organization_name }}"
+      email_address: "{{ email_address }}"
+      common_name: "{{ server_hostname }}"
+      
+  - name: Генерируем самоподписанный OpenSSL сертификат
+    openssl_certificate:
+      path: "/home/vagrant/cert/{{ server_hostname }}_cert.pem"
+      privatekey_path: "/home/vagrant/cert/{{ server_hostname }}_privkey.pem"
+      csr_path: "/home/vagrant/cert/{{ server_hostname }}.csr"
+      provider: selfsigned
+
+
+
+
